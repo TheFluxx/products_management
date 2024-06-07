@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPushButton, QMessageBox, QTableWidget, QTableWidgetItem, QHBoxLayout, QLabel, QComboBox, QFontComboBox, QSpinBox
 from PyQt5.QtCore import QDate, pyqtSignal
 from database import Database
+from ui_helpers import show_message, show_warning, fill_table_with_products, fill_table_with_report, get_product_id_and_quantity
 from PyQt5.QtWidgets import QApplication
 
 class AddProductForm(QWidget):
@@ -34,13 +35,16 @@ class AddProductForm(QWidget):
         name = self.productNameInput.text()
 
         if not name:
+            show_warning(self, 'Ошибка', 'Название продукта не может быть пустым')
             return
 
         existing_product = self.db.get_product_by_name(name)
         if existing_product:
+            show_warning(self, 'Ошибка', 'Продукт с таким названием уже существует')
             return
 
         self.db.add_product(name)
+        show_message(self, 'Успех', 'Продукт успешно добавлен')
         self.data_updated.emit()
 
 
@@ -79,7 +83,15 @@ class AddReceiptForm(QWidget):
         name = self.receiptProductNameInput.text()
         quantity_text = self.receiptQuantityInput.text()
 
+        product_id, current_quantity, error = get_product_id_and_quantity(self.db, name, quantity_text)
+        if error:
+            show_warning(self, 'Ошибка', error)
+            return
 
+        new_quantity = current_quantity + float(quantity_text)
+        self.db.update_product_quantity(product_id, new_quantity)
+        self.db.add_receipt(product_id, QDate.currentDate().toString('yyyy-MM-dd'), float(quantity_text))
+        show_message(self, 'Успех', 'Поступление успешно добавлено')
         self.data_updated.emit()
 
 class AddIssueForm(QWidget):
@@ -116,6 +128,20 @@ class AddIssueForm(QWidget):
         name = self.issueProductNameInput.text()
         quantity_text = self.issueQuantityInput.text()
 
+        product_id, current_quantity, error = get_product_id_and_quantity(self.db, name, quantity_text)
+        if error:
+            show_warning(self, 'Ошибка', error)
+            return
+
+        if current_quantity < float(quantity_text):
+            show_warning(self, 'Ошибка', 'Недостаточное количество продукта')
+            return
+
+        new_quantity = current_quantity - float(quantity_text)
+        self.db.update_product_quantity(product_id, new_quantity)
+        self.db.add_issue(product_id, QDate.currentDate().toString('yyyy-MM-dd'), float(quantity_text))
+        show_message(self, 'Успех', 'Выдача успешно добавлена')
+        self.data_updated.emit()
 
 class ReportForm(QWidget):
     go_back = pyqtSignal()
@@ -142,6 +168,7 @@ class ReportForm(QWidget):
 
     def generateReport(self):
         products = self.db.get_all_products()
+        fill_table_with_report(self.reportTable, products)
 
 class ViewProductsForm(QWidget):
     go_back = pyqtSignal()
@@ -184,12 +211,30 @@ class ViewProductsForm(QWidget):
 
     def refresh(self):
         products = self.db.get_all_products()
+        fill_table_with_products(self.productsTable, products)
 
     def editProduct(self):
         product_id = self.editIdInput.text()
         new_name = self.editNameInput.text()
         new_quantity_text = self.editQuantityInput.text()
 
+        if not product_id:
+            show_warning(self, 'Ошибка', 'ID продукта не может быть пустым')
+            return
+
+        if not new_quantity_text:
+            show_warning(self, 'Ошибка', 'Количество не может быть пустым')
+            return
+
+        try:
+            new_quantity = float(new_quantity_text)
+        except ValueError:
+            show_warning(self, 'Ошибка', 'Количество должно быть числом')
+            return
+
+        self.db.update_product(product_id, new_name, new_quantity)
+        show_message(self, 'Успех', 'Продукт успешно обновлен')
+        self.refresh()
 
 class SearchProductForm(QWidget):
     go_back = pyqtSignal()
@@ -223,6 +268,7 @@ class SearchProductForm(QWidget):
     def searchProduct(self):
         search_text = self.searchProductInput.text()
         products = self.db.search_products_by_name(search_text)
+        fill_table_with_products(self.searchResultsTable, products)
 
 
 class SettingsForm(QWidget):
