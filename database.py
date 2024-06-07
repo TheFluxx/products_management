@@ -45,4 +45,56 @@ class Database:
         """)
         self.conn.commit()
 
+    def add_product(self, name):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO products (name) VALUES (?)", (name,))
+        self.conn.commit()
 
+    def get_product_by_name(self, name):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, quantity FROM products WHERE name = ?", (name,))
+        return cursor.fetchone()
+
+    def update_product_quantity(self, product_id, quantity):
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE products SET quantity = ? WHERE id = ?", (quantity, product_id))
+        self.conn.commit()
+
+    def add_receipt(self, product_id, date, quantity):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO receipts (product_id, date, quantity) VALUES (?, ?, ?)",
+                       (product_id, date, quantity))
+        self.conn.commit()
+
+    def add_issue(self, product_id, date, quantity):
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO issues (product_id, date, quantity) VALUES (?, ?, ?)",
+                       (product_id, date, quantity))
+        self.conn.commit()
+
+    def get_all_products(self):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, name, quantity FROM products")
+        return cursor.fetchall()
+
+    def get_product_by_id(self, product_id):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, name, quantity FROM products WHERE id = ?", (product_id,))
+        return cursor.fetchone()
+
+    def search_products_by_name(self, name):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT id, name, quantity FROM products WHERE name LIKE ?", ('%' + name + '%',))
+        return cursor.fetchall()
+
+    def update_product(self, product_id, name, quantity):
+        cursor = self.conn.cursor()
+        cursor.execute("UPDATE products SET name = ?, quantity = ? WHERE id = ?", (name, quantity, product_id))
+        self.conn.commit()
+
+    def restore_database(self):
+        cursor = self.conn.cursor()
+        cursor.execute("DROP TABLE IF EXISTS products")
+        cursor.execute("DROP TABLE IF EXISTS receipts")
+        cursor.execute("DROP TABLE IF EXISTS issues")
+        self.create_tables()
